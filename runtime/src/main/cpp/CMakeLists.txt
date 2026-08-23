@@ -8,6 +8,9 @@ project(hermes-test-env CXX)
 if (NOT DEFINED HERMES_DIR)
   set(HERMES_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../third-party/hermes")
 endif ()
+if (NOT DEFINED FBJNI_DIR)
+  set(FBJNI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../third-party/fbjni")
+endif ()
 
 # Gradle injects -DJAVA_HOME; the JNI headers come from it. IDE CMake syncs configure this file
 # directly without any -D vars, so derive it from the environment or the macOS java_home helper.
@@ -41,6 +44,13 @@ set(HERMES_BUILD_SHARED_JSI OFF CACHE BOOL "" FORCE)
 set(HERMES_ENABLE_DEBUGGER OFF CACHE BOOL "" FORCE)
 set(HERMES_ENABLE_TEST_SUITE OFF CACHE BOOL "" FORCE)
 add_subdirectory(${HERMES_DIR} hermes-build EXCLUDE_FROM_ALL)
+
+# --- fbjni (vendored) -----------------------------------------------------------------------------
+# Nothing here uses it: it is built and shipped for consumers that benchmark their own JNI dispatch
+# against fbjni's, so they need neither the submodule nor a second toolchain hop. fbjni hard-requires
+# JAVA_HOME for a non-Android build, which is resolved above. Skip its own gtest suite.
+set(FBJNI_SKIP_TESTS ON CACHE BOOL "" FORCE)
+add_subdirectory(${FBJNI_DIR} fbjni-build EXCLUDE_FROM_ALL)
 
 # --- The host library ---------------------------------------------------------------------------
 add_library(hermes-test-env SHARED

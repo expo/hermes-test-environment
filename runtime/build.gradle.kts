@@ -22,11 +22,18 @@ val nativeBuildType = providers.gradleProperty("nativeBuildType").orElse("Releas
 // sources this build compiles and exports.
 val hermesDir = rootProject.layout.projectDirectory.dir("third-party/hermes")
 
+// fbjni, vendored the same way. This environment does not use it — it ships it, so a consumer can
+// benchmark its own JNI dispatch against fbjni's without vendoring anything.
+val fbjniDir = rootProject.layout.projectDirectory.dir("third-party/fbjni")
+
 // Everything published here is built from that tree, so an uninitialized submodule has to fail
 // with the fix rather than with a CMake error or a zip holding nothing.
-fun checkHermesCheckout() {
-  check(hermesDir.file("CMakeLists.txt").asFile.exists()) {
-    "the Hermes submodule is missing — run `git submodule update --init --recursive`"
+fun checkSubmodules() {
+  for (submodule in listOf(hermesDir, fbjniDir)) {
+    check(submodule.file("CMakeLists.txt").asFile.exists()) {
+      "the ${submodule.asFile.name} submodule is missing — run " +
+        "`git submodule update --init --recursive`"
+    }
   }
 }
 
@@ -51,7 +58,7 @@ kotlin {
 // --- Native build (CMake + Ninja) ---------------------------------------------------------------
 
 val configureNative by tasks.registering(Exec::class) {
-  doFirst { checkHermesCheckout() }
+  doFirst { checkSubmodules() }
   inputs.dir(cppDir)
   inputs.property("nativeBuildType", nativeBuildType)
   outputs.dir(nativeBuildDir)
@@ -75,24 +82,30 @@ val buildNative by tasks.registering(Exec::class) {
   outputs.dir(nativeBuildDir)
 
   workingDir = rootDir
-  commandLine("cmake", "--build", nativeBuildDir.get().asFile.path, "--target", "hermes-test-env")
+  // fbjni is EXCLUDE_FROM_ALL (this library never links it), so it has to be named explicitly.
+  commandLine(
+    "cmake", "--build", nativeBuildDir.get().asFile.path,
+    "--target", "hermes-test-env", "fbjni",
+  )
 }
 
-val sharedLibraryName = if (OperatingSystem.current().isMacOsX) {
-  "libhermes-test-env.dylib"
-} else {
-  "libhermes-test-env.so"
-}
+val sharedLibrarySuffix = if (OperatingSystem.current().isMacOsX) ".dylib" else ".so"
+val sharedLibraryName = "libhermes-test-env$sharedLibrarySuffix"
+val fbjniLibraryName = "libfbjni$sharedLibrarySuffix"
 
 val copyNativeLibs by tasks.registering(Copy::class) {
   dependsOn(buildNative)
   from(nativeBuildDir.map { it.file(sharedLibraryName) })
+  from(nativeBuildDir.map { it.file("fbjni-build/$fbjniLibraryName") })
   into(nativeLibsDir)
   doLast {
-    // A published artifact without the library is useless to a consumer and fails much later, in
+    // A published artifact without the libraries is useless to a consumer and fails much later, in
     // their link step, so stop here instead.
-    val library = nativeLibsDir.get().file(sharedLibraryName).asFile
-    check(library.exists()) { "the native build produced no $sharedLibraryName" }
+    for (name in listOf(sharedLibraryName, fbjniLibraryName)) {
+      check(nativeLibsDir.get().file(name).asFile.exists()) {
+        "the native build produced no $name"
+      }
+    }
   }
 }
 
@@ -112,11 +125,19 @@ tasks.named<Test>("test") {
 // conversion compiles it itself). Shipping these is what frees a consumer from vendoring Hermes.
 val jsiSourcesZip by tasks.registering(Zip::class) {
   archiveClassifier = "jsi-cpp"
-  doFirst { checkHermesCheckout() }
+  doFirst { checkSubmodules() }
   from(hermesDir.dir("API/jsi")) {
     include("**/*.h")
     include("jsi/JSIDynamic.cpp")
     exclude("**/test/**")
+  }
+}
+
+val fbjniSourcesZip by tasks.registering(Zip::class) {
+  archiveClassifier = "fbjni-cpp"
+  doFirst { checkSubmodules() }
+  from(fbjniDir.dir("cxx")) {
+    include("**/*.h")
   }
 }
 
@@ -135,6 +156,7 @@ publishing {
       artifactId = publishedArtifactId
       from(components["java"])
       artifact(jsiSourcesZip)
+      artifact(fbjniSourcesZip)
       artifact(nativeLibsZip)
     }
   }

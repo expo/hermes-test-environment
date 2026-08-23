@@ -36,6 +36,9 @@ consumer's CMake picks the provider — see `expo-modules-android-v2`'s
 
 - `third-party/hermes` — the vendored Hermes tree (submodule, branch `static_h`). It carries both
   the VM and the JSI sources; there is no separate JSI repository.
+- `third-party/fbjni` — vendored too, and shipped but never used here: a consumer that benchmarks
+  its own JNI dispatch against fbjni's gets the library and headers from this artifact instead of
+  vendoring the tree itself.
 - `runtime/` — the desktop (JVM) host: `io.github.expo.hermes.HermesRuntime` plus the native library.
 
 ## Use it (desktop)
