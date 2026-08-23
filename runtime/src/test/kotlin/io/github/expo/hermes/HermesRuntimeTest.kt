@@ -1,4 +1,4 @@
-package expo.hermes.env
+package io.github.expo.hermes
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

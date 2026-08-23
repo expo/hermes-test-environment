@@ -4,6 +4,6 @@ plugins {
 }
 
 allprojects {
-  group = "expo.hermes"
+  group = "io.github.expo"
   version = "0.1.0-SNAPSHOT"
 }

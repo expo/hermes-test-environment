@@ -5,6 +5,14 @@ plugins {
   `maven-publish`
 }
 
+// The published artifact id. The Gradle project stays `:runtime` because the repository is the
+// environment; this is the one thing inside it that gets published.
+val publishedArtifactId = "hermes-test-environment"
+
+base {
+  archivesName = publishedArtifactId
+}
+
 val cppDir = layout.projectDirectory.dir("src/main/cpp")
 val nativeBuildDir = layout.buildDirectory.dir("native")
 val nativeLibsDir = layout.buildDirectory.dir("native-libs")
@@ -13,6 +21,14 @@ val nativeBuildType = providers.gradleProperty("nativeBuildType").orElse("Releas
 // The vendored Hermes tree (git submodule under //third-party). It carries both the VM and the JSI
 // sources this build compiles and exports.
 val hermesDir = rootProject.layout.projectDirectory.dir("third-party/hermes")
+
+// Everything published here is built from that tree, so an uninitialized submodule has to fail
+// with the fix rather than with a CMake error or a zip holding nothing.
+fun checkHermesCheckout() {
+  check(hermesDir.file("CMakeLists.txt").asFile.exists()) {
+    "the Hermes submodule is missing — run `git submodule update --init --recursive`"
+  }
+}
 
 sourceSets {
   main {
@@ -35,6 +51,7 @@ kotlin {
 // --- Native build (CMake + Ninja) ---------------------------------------------------------------
 
 val configureNative by tasks.registering(Exec::class) {
+  doFirst { checkHermesCheckout() }
   inputs.dir(cppDir)
   inputs.property("nativeBuildType", nativeBuildType)
   outputs.dir(nativeBuildDir)
@@ -71,6 +88,12 @@ val copyNativeLibs by tasks.registering(Copy::class) {
   dependsOn(buildNative)
   from(nativeBuildDir.map { it.file(sharedLibraryName) })
   into(nativeLibsDir)
+  doLast {
+    // A published artifact without the library is useless to a consumer and fails much later, in
+    // their link step, so stop here instead.
+    val library = nativeLibsDir.get().file(sharedLibraryName).asFile
+    check(library.exists()) { "the native build produced no $sharedLibraryName" }
+  }
 }
 
 // Make the native library available whenever the module is assembled or tested.
@@ -89,6 +112,7 @@ tasks.named<Test>("test") {
 // conversion compiles it itself). Shipping these is what frees a consumer from vendoring Hermes.
 val jsiSourcesZip by tasks.registering(Zip::class) {
   archiveClassifier = "jsi-cpp"
+  doFirst { checkHermesCheckout() }
   from(hermesDir.dir("API/jsi")) {
     include("**/*.h")
     include("jsi/JSIDynamic.cpp")
@@ -102,9 +126,13 @@ val nativeLibsZip by tasks.registering(Zip::class) {
   from(nativeLibsDir)
 }
 
+// Publishing builds the native library and packages the JSI sources next to the jar, so the
+// artifact is self-contained: a consumer links and runs against it without a Hermes checkout, a
+// toolchain, or any task of their own beyond unpacking the zips.
 publishing {
   publications {
     create<MavenPublication>("maven") {
+      artifactId = publishedArtifactId
       from(components["java"])
       artifact(jsiSourcesZip)
       artifact(nativeLibsZip)

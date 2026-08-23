@@ -1,4 +1,4 @@
-package expo.hermes.env
+package io.github.expo.hermes
 
 /**
  * Loads the native library that carries the Hermes VM and the JSI copy this environment exports

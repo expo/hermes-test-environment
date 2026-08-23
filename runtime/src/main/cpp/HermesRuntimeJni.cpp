@@ -9,7 +9,7 @@
 
 namespace {
   // The internal (binary) class name of the JVM handle these natives are registered against.
-  constexpr const char* kHandleClass = "expo/hermes/env/HermesRuntime";
+  constexpr const char* kHandleClass = "io/github/expo/hermes/HermesRuntime";
 
   facebook::jsi::Runtime* asRuntime(jlong pointer) {
     return reinterpret_cast<facebook::jsi::Runtime*>(pointer);

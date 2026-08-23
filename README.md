@@ -36,7 +36,7 @@ consumer's CMake picks the provider — see `expo-modules-android-v2`'s
 
 - `third-party/hermes` — the vendored Hermes tree (submodule, branch `static_h`). It carries both
   the VM and the JSI sources; there is no separate JSI repository.
-- `runtime/` — the desktop (JVM) host: `expo.hermes.env.HermesRuntime` plus the native library.
+- `runtime/` — the desktop (JVM) host: `io.github.expo.hermes.HermesRuntime` plus the native library.
 
 ## Use it (desktop)
 

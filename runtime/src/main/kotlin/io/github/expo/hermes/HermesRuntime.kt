@@ -1,4 +1,4 @@
-package expo.hermes.env
+package io.github.expo.hermes
 
 /**
  * A Hermes VM created on the calling thread, exposed to the JVM as the address of its
