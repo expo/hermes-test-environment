@@ -1,7 +1,7 @@
 [submodule "third-party/hermes"]
 	path = third-party/hermes
 	url = https://github.com/facebook/hermes.git
-	branch = static_h
+	branch = 260318099.0.0-stable
 [submodule "third-party/fbjni"]
 	path = third-party/fbjni
 	url = https://github.com/facebookincubator/fbjni.git
