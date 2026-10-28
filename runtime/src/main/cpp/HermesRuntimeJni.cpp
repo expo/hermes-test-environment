@@ -37,7 +37,11 @@ namespace {
    */
   jlong nativeCreate(JNIEnv* env, jclass) {
     try {
-      std::unique_ptr<facebook::jsi::Runtime> runtime = facebook::hermes::makeHermesRuntime();
+      // The microtask queue is what React Native's bridgeless runtime turns on (see its
+      // HermesInstance.cpp). Hermes defaults it to off, which makes Promise fall back to a
+      // `setImmediate` that this environment does not provide.
+      auto config = ::hermes::vm::RuntimeConfig::Builder().withMicrotaskQueue(true).build();
+      std::unique_ptr<facebook::jsi::Runtime> runtime = facebook::hermes::makeHermesRuntime(config);
       return reinterpret_cast<jlong>(runtime.release());
     } catch (const std::exception& exception) {
       throwRuntimeException(env, std::string("failed to create a Hermes runtime: ") + exception.what());
